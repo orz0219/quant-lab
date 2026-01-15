@@ -48,13 +48,16 @@ if __name__ == '__main__':
     #     print(h)
     # print(df['trade_date'].max())
     # df = df[df['ts_code'] == '000001.SZ']
-    df['trade_date'] = pd.to_datetime(df['trade_date'], format='%Y%m%d')
+    print(df[['ts_code', 'trade_date']].head())
+    df['ts_code'] = df['ts_code'].astype('category')
+    df['trade_date'] = df['trade_date'].astype('category')
     df = df.sort_values(by=['ts_code', 'trade_date'], ascending=[True, True])
     df['EMA5'] = round(df['close'].ewm(span=5, adjust=False).mean(),2)
     df['EMA21'] = round(df['close'].ewm(span=21, adjust=False).mean(),2)
     df['EMA55'] = round(df['close'].ewm(span=55, adjust=False).mean(),2)
     df['EMA144'] = round(df['close'].ewm(span=144, adjust=False).mean(),2)
-
-    df = df.query('EMA5 > EMA144').query('EMA21 > EMA55').query('trade_date == 20260115')
-    df.to_csv('20260115.csv', index=False)
+    df['B1'] = (df['EMA144'].shift(1) < df['EMA144']) & (df['EMA144'] < df['EMA5']) & (df['EMA5'].shift(10) < df['EMA144'].shift(10)) & (df['EMA21'] > df['EMA55'])
+    df['B2'] = (df['EMA144'].shift(1) < df['EMA144']) & (df['EMA144'] < df['EMA5']) & (df['EMA21'].shift(10) < df['EMA144'].shift(10)) & (df['EMA21'] > df['EMA55']) & (df['EMA21'] > df['EMA144'])
+    df = df.query('B2').query('trade_date == 20260115')
+    df.to_csv('20260115B2.csv', index=False)
 

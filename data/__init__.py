@@ -58,6 +58,6 @@ if __name__ == '__main__':
     df['EMA144'] = round(df['close'].ewm(span=144, adjust=False).mean(),2)
     df['B1'] = (df['EMA144'].shift(1) < df['EMA144']) & (df['EMA144'] < df['EMA5']) & (df['EMA5'].shift(10) < df['EMA144'].shift(10)) & (df['EMA21'] > df['EMA55'])
     df['B2'] = (df['EMA144'].shift(1) < df['EMA144']) & (df['EMA144'] < df['EMA5']) & (df['EMA21'].shift(10) < df['EMA144'].shift(10)) & (df['EMA21'] > df['EMA55']) & (df['EMA21'] > df['EMA144'])
-    df = df.query('B2').query('trade_date == 20260115')
+    df = df.query('B2').query('trade_date == 20260115').query('amount >= 200000')
     df.to_csv('20260115B2.csv', index=False)
 

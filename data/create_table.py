@@ -1,56 +1,135 @@
+from datetime import datetime, timedelta
+
 import duckdb
+import pandas as pd
 
-if __name__ == '__main__':
-    import duckdb
+# 链接数据库
+con = duckdb.connect('stock.duckdb')
 
-    con = duckdb.connect('stock.duckdb')
-
-    # 创建表 + 索引
-    con.execute("""
-               CREATE TABLE IF NOT EXISTS daily (
-    ts_code VARCHAR,
-    trade_date INTEGER,
-    open FLOAT,
-    high FLOAT,
-    low FLOAT,
-    close FLOAT,
-    pre_close FLOAT,
-    change FLOAT,
-    pct_chg FLOAT,
-    vol BIGINT,
-    amount DOUBLE
-);
-CREATE INDEX IF NOT EXISTS idx_code_date ON daily(ts_code, trade_date);
-                """)
-
-    df = duckdb.sql("""
-                    SELECT ts_code,
-trade_date,
-open,
-high,
-low,
-close,
-pre_close,
-change,
-pct_chg,
-vol,
-amount
-                    FROM '20260115.parquet'
-                    """).df()
-
-
+def add_db():
+    df = pd.read_csv('1.csv')
     # 插入数据（df 是你的 pandas DataFrame）
     con.register('df_input', df)
     con.execute("INSERT INTO daily SELECT * FROM df_input")
 
-    # 查询示例
-    result = con.sql("""
-                     SELECT trade_date, close, pct_chg
-                     FROM daily
-                     WHERE ts_code = '000001.SZ'
-                     ORDER BY trade_date DESC
-                         LIMIT 10
-                     """).df()
+def get_monday(date_str=None, fmt='%Y%m%d'):
+    if date_str is None:
+        date_str = datetime.today().strftime('%Y%m%d')
+    dt = datetime.strptime(date_str, fmt)
+    monday = dt - timedelta(days=dt.weekday())  # weekday(): Monday=0, Sunday=6
+    return monday.strftime(fmt)
 
-    print(result)
-    con.close()
+def get_week_data(ts_code: str):
+    this_week = get_monday()
+
+    data = con.sql("""
+        SELECT * FROM daily WHERE ts_code = ? and trade_date < ? ORDER BY trade_date
+    """, params=[ts_code, this_week]).fetchall()
+
+    if not data:
+        print(f"=== {ts_code} 无日K数据 ===")
+        return
+
+    # 按周分组
+    weeks = {}
+    for row in data:
+        ts_code_row, trade_date, o, h, l, c, *_rest, vol, amt = row
+        monday = get_monday(str(trade_date))
+        key = (ts_code_row, monday)
+
+        if key not in weeks:
+            weeks[key] = {
+                'dates': [],
+                'opens': [],
+                'highs': [],
+                'lows': [],
+                'closes': [],
+                'vols': [],
+                'amounts': []
+            }
+
+        weeks[key]['dates'].append(trade_date)
+        weeks[key]['opens'].append(o)
+        weeks[key]['highs'].append(h)
+        weeks[key]['lows'].append(l)
+        weeks[key]['closes'].append(c)
+        weeks[key]['vols'].append(vol)
+        weeks[key]['amounts'].append(amt)
+
+    # 生成周K（字典列表）
+    weekly_k = []
+    for (ts_code_key, week_start), values in weeks.items():
+        weekly_k.append({
+            'ts_code': ts_code_key,
+            'trade_date': min(values['dates']),
+            'open': values['opens'][0],
+            'high': max(values['highs']),
+            'low': min(values['lows']),
+            'close': values['closes'][-1],
+            'vol': sum(values['vols']),
+            'amount': sum(values['amounts'])
+        })
+
+    if not weekly_k:
+        print(f"=== {ts_code} 无法生成周K ===")
+        return
+
+    # 转为元组列表
+    weekly_tuples = [
+        (
+            wk['ts_code'],
+            wk['trade_date'],
+            wk['open'],
+            wk['high'],
+            wk['low'],
+            wk['close'],
+            wk['vol'],
+            wk['amount']
+        )
+        for wk in weekly_k
+    ]
+
+    # 去重逻辑
+    new_keys = [(row[0], row[1]) for row in weekly_tuples]
+    placeholders = ', '.join(['(?, ?)'] * len(new_keys))
+    existing = con.execute(f"""
+        SELECT ts_code, trade_date 
+        FROM weekly 
+        WHERE (ts_code, trade_date) IN ({placeholders})
+    """, [item for pair in new_keys for item in pair]).fetchall()
+
+    existing_set = set(existing)
+    filtered_tuples = [
+        row for row in weekly_tuples
+        if (row[0], row[1]) not in existing_set
+    ]
+
+    # 插入新数据
+    if filtered_tuples:
+        con.executemany("""
+            INSERT INTO weekly (ts_code, trade_date, open, high, low, close, vol, amount)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, filtered_tuples)
+        print(f"=== {ts_code} 插入 {len(filtered_tuples)} 条周K ===")
+    else:
+        print(f"=== {ts_code} 无新周K需要插入 ===")
+
+    print(f"=== {ts_code} end! ===")
+
+def code_select():
+    yesterday_str = (datetime.today() - timedelta(days=1)).strftime('%Y%m%d')
+    codes = con.sql("""
+        select ts_code from daily where trade_date= ? order by ts_code
+    """, params=[yesterday_str]).fetchall()
+    return [row[0] for row in codes]
+
+def refresh_all():
+    codes = code_select()
+    for code in codes:
+        get_week_data(code)
+
+
+if __name__ == '__main__':
+    # 计算周K 获取每周的日期 然后查询
+    refresh_all()
+

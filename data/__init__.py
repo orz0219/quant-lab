@@ -13,7 +13,7 @@ def select_new_data(trade_date):
 
 def select_data():
 
-    start_str = "20250920"  # 修改为合理起始日
+    start_str = "20260205"  # 修改为合理起始日
     end_date = datetime.today()  # 2026-01-15
 
     start_date = datetime.strptime(start_str, "%Y%m%d")
@@ -42,7 +42,7 @@ def to_new_parquet():
 
 
 if __name__ == '__main__':
-    print(1)
+    select_data()
     # df['EMA5'] = round(df['close'].ewm(span=5, adjust=False).mean(),2)
     # df['EMA21'] = round(df['close'].ewm(span=21, adjust=False).mean(),2)
     # df['EMA55'] = round(df['close'].ewm(span=55, adjust=False).mean(),2)

@@ -19,12 +19,16 @@ def get_monday(date_str=None, fmt='%Y%m%d'):
     monday = dt - timedelta(days=dt.weekday())  # weekday(): Monday=0, Sunday=6
     return monday.strftime(fmt)
 
-def get_week_data(ts_code: str):
+def get_week_data(ts_code: str, td = 1):
     this_week = get_monday()
 
+    con.sql("""
+        delete from weekly WHERE ts_code = ? and trade_date >= ?
+    """, params=[ts_code, td])
+
     data = con.sql("""
-        SELECT * FROM daily WHERE ts_code = ? and trade_date < ? ORDER BY trade_date
-    """, params=[ts_code, this_week]).fetchall()
+        SELECT * FROM daily WHERE ts_code = ? and trade_date < ? and trade_date >= ? ORDER BY trade_date
+    """, params=[ts_code, this_week, td]).fetchall()
 
     if not data:
         print(f"=== {ts_code} 无日K数据 ===")
@@ -116,8 +120,8 @@ def get_week_data(ts_code: str):
 
     print(f"=== {ts_code} end! ===")
 
-def code_select():
-    yesterday_str = (datetime.today() - timedelta(days=1)).strftime('%Y%m%d')
+def code_select(yesterday_str = 20260126):
+    # yesterday_str = (datetime.today() - timedelta(days=1)).strftime('%Y%m%d')
     codes = con.sql("""
         select ts_code from daily where trade_date= ? order by ts_code
     """, params=[yesterday_str]).fetchall()
@@ -128,8 +132,32 @@ def refresh_all():
     for code in codes:
         get_week_data(code)
 
+def refresh_weeks(week):
+    codes = code_select(week)
+    for code in codes:
+        get_week_data(code, week)
+
 
 if __name__ == '__main__':
     # 计算周K 获取每周的日期 然后查询
-    refresh_all()
+    # refresh_weeks(20260125)
+    # add_db()
+    # con.execute("""
+    # DROP TABLE week_check""")
+
+
+    con.execute(f"""
+        CREATE TABLE IF NOT EXISTS week_check(
+            ts_code VARCHAR,
+            trade_date BIGINT,
+            -- 价格和盈亏字段改为 DECIMAL(18, 4)
+            price_open DECIMAL(18, 4),
+            price_high DECIMAL(18, 4),
+            price_low DECIMAL(18, 4),
+            price_close DECIMAL(18, 4),
+            current_trend VARCHAR,
+            extra_mark VARCHAR,
+            buy_tag VARCHAR
+        )
+    """)
 

@@ -16,14 +16,7 @@ from create_table import code_select
 con = duckdb.connect('stock.duckdb')
 
 
-def check(d=20050224, code='000001.SZ'):
-    result = con.sql("""
-                     select *
-                     from weekly
-                     where trade_date > ?
-                       and ts_code = ?
-                     order by trade_date
-                     """, params=[d, code]).fetchall()
+def check(result):
     code = ''
     prev_low = None
     prev_high = None
@@ -32,14 +25,15 @@ def check(d=20050224, code='000001.SZ'):
     down_reversal_count = 0  # 下降反转计数器（U→D）
     last_up_high = None  # 上一次上升反转的high值
     last_down_low = None  # 上一次下降反转的low值
-    buy_tag = ''
-    last_is_high = False
     last_is_buy = False
     last_buy_price = 0.0
     profit = Decimal('0.00')
     total_profit = Decimal('0.00')
+    resistance_price = Decimal('0')
 
     data_to_insert = []
+
+    recent_trends = []
 
     for row in result:
         if code == '':
@@ -60,15 +54,8 @@ def check(d=20050224, code='000001.SZ'):
             prev_trend = trend
             continue
 
-        if last_is_high and price_high > prev_high and not last_is_buy:
-            buy_tag = 'BUY'
-            last_is_high = False
-            last_is_buy = True
-            last_buy_price = prev_high + Decimal('0.01')
-            profit = (price_high - price_low)
-        else:
-            buy_tag = ''
-            last_is_high = False
+
+        buy_tag = ''
 
         # 计算当前趋势
         current_trend = prev_trend  # 默认为前一个趋势
@@ -84,6 +71,13 @@ def check(d=20050224, code='000001.SZ'):
         # 如果两者都满足，延续前一个趋势
         if price_high > prev_high and price_low < prev_low:
             current_trend = prev_trend
+
+        recent_trends.append(current_trend)
+        if len(recent_trends) > 30:
+            recent_trends.pop(0)  # 移除最旧的元素
+        total_recent = len(recent_trends)
+        count_u = recent_trends.count('U')
+        percent_u = round((count_u / total_recent) * 100 if total_recent > 0 else 0, 2)
 
         # 检查趋势反转
         extra_mark = ''
@@ -101,13 +95,15 @@ def check(d=20050224, code='000001.SZ'):
                     up_reversal_count = 1
                     extra_mark = 'H1 支撑'
                     last_up_high = price_high  # 更新为当前high
-                    last_is_high = True
                 else:
                     # 正常递增
                     up_reversal_count += 1
                     extra_mark = f'H{up_reversal_count}'
                     last_up_high = price_high  # 更新为当前high
-
+            profit = (price_high - price_low)
+            if resistance_price - price_high > 2 * profit:
+                buy_tag = 'BUY'
+                last_buy_price = price_high + Decimal(0.01)
         elif prev_trend == 'U' and current_trend == 'D':
             # 下降反转：U→D
             if last_down_low is None:
@@ -127,6 +123,7 @@ def check(d=20050224, code='000001.SZ'):
                     down_reversal_count += 1
                     extra_mark = f'L{down_reversal_count}'
                     last_down_low = price_low  # 更新为当前low
+            resistance_price = prev_high
         if last_is_buy and buy_tag == '':
             profit_now = prev_low - Decimal('0.01') - last_buy_price
             if profit_now > profit * Decimal(2) and (prev_trend == 'U' and current_trend == 'D'):
@@ -139,42 +136,62 @@ def check(d=20050224, code='000001.SZ'):
                 last_is_buy = False
 
         # 打印结果
-        # print(
-        #     f"{code} {trade_date} {price_open} {price_close} {price_high} {price_low} {current_trend} {extra_mark} {buy_tag}")
+        if trade_date == 20260224:
+            print(
+            f"{code} {trade_date} {price_open} {price_close} {price_high} {price_low} {current_trend} {extra_mark} {buy_tag} {resistance_price} {percent_u}")
 
-        data_to_insert.append((
-            code,
-            trade_date,
-            price_open,
-            price_high,
-            price_low,
-            price_close,
-            current_trend,
-            extra_mark,
-            buy_tag
-        ))
+            data_to_insert.append((
+                code,
+                trade_date,
+                price_open,
+                price_high,
+                price_low,
+                price_close,
+                current_trend,
+                extra_mark,
+                buy_tag,
+                resistance_price,
+                percent_u
+            ))
 
         # 更新前值
         prev_low = price_low
         prev_high = price_high
         prev_trend = current_trend
-
-    if data_to_insert:
-        con.executemany(f"""
-                INSERT INTO week_check 
-                (ts_code, trade_date, price_open, price_high, price_low, price_close, 
-                 current_trend, extra_mark, buy_tag)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, data_to_insert)
-        print(f"成功将 {len(data_to_insert)} 条 {code} 回测结果存入 week_check 表中。")
-    else:
-        print("没有数据需要存储。")
+    return data_to_insert
 
 
-if __name__ == '__main__':
+def check_all(the_date=20210224):
     con.execute("""
         truncate table week_check;
     """)
-    code_list = code_select()
-    for code in code_list:
-        check(code=code)
+    result = con.sql("""
+                     select *
+                     from weekly
+                     where trade_date >= ?
+                     order by ts_code, trade_date
+                     """, params=[the_date]).fetchall()
+
+    grouped_data = {}
+    for row in result:
+        ts_code = row[0]  # 根据实际表结构调整索引
+        if ts_code not in grouped_data:
+            grouped_data[ts_code] = []
+        grouped_data[ts_code].append(row)
+
+    data_to_insert = []
+    for ts_code in grouped_data:
+        arr = check(grouped_data[ts_code])
+        data_to_insert.extend(arr)
+
+    con.executemany(f"""
+                    INSERT INTO week_check 
+                    (ts_code, trade_date, price_open, price_high, price_low, price_close, 
+                     current_trend, extra_mark, buy_tag, resistance_price, percent_u_30)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, data_to_insert)
+
+
+if __name__ == '__main__':
+    check_all()
+    # check()

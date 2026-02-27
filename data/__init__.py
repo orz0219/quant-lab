@@ -13,7 +13,7 @@ def select_new_data(trade_date):
 
 def select_data():
 
-    start_str = "20260205"  # 修改为合理起始日
+    start_str = "20260225"  # 修改为合理起始日
     end_date = datetime.today()  # 2026-01-15
 
     start_date = datetime.strptime(start_str, "%Y%m%d")

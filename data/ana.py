@@ -179,9 +179,18 @@ def check_all(the_date=20160224, ts_code=None):
         #              FROM temp_append
         #              """)
 
+def select_today():
+    codes = con.sql("""
+        select ts_code from week_check where trade_date = 20260302 and pin_bar_tag != 'N'
+            and ts_code not in (select ts_code from week_check where trade_date = 20260224 and pin_bar_tag != 'N')
+    """).fetchall()
+    for code in codes:
+        print(code[0])
+
 
 if __name__ == '__main__':
-    check_all()
+    # check_all()
+    select_today()
     # check_all()
     # check()
     # print(con.execute("""

@@ -4,6 +4,8 @@ import pandas as pd
 import tushare as ts
 import duckdb
 
+# 链接数据库
+con = duckdb.connect('stock.duckdb')
 
 def select_new_data(trade_date):
     ts.set_token('dc2bbdf3938e0a303770329971c6f0679d1b74c99ea74c9623ebd5c3')
@@ -12,11 +14,14 @@ def select_new_data(trade_date):
     return df
 
 def select_data():
-
-    start_str = "20260225"  # 修改为合理起始日
+    last_date = con.sql("""
+        select max(trade_date) from daily
+    """).fetchone()
+    start_str = str(last_date[0])  # 修改为合理起始日
     end_date = datetime.today()  # 2026-01-15
 
     start_date = datetime.strptime(start_str, "%Y%m%d")
+    start_date = start_date + timedelta(days=1)
     current = start_date
     x = pd.DataFrame([])
     while current <= end_date:

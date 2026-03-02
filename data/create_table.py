@@ -123,7 +123,11 @@ def get_week_data(ts_code: str, td = None):
 
 def code_select(yesterday_str = None):
     if yesterday_str is None:
-        yesterday_str = (datetime.today() - timedelta(days=1)).strftime('%Y%m%d')
+        last_date = con.sql("""
+                            select max(trade_date)
+                            from daily
+                            """).fetchone()
+        yesterday_str = last_date[0]
     codes = con.sql("""
         select ts_code from daily where trade_date= ? and (ts_code like '00%' or ts_code like '60%') order by ts_code
     """, params=[yesterday_str]).fetchall()
@@ -134,7 +138,7 @@ def refresh_all():
     for code in codes:
         get_week_data(code)
 
-def refresh_weeks(week):
+def refresh_weeks(week=None):
     codes = code_select(week)
     for code in codes:
         get_week_data(code, week)
@@ -143,7 +147,8 @@ def refresh_weeks(week):
 if __name__ == '__main__':
     # 计算周K 获取每周的日期 然后查询
     # add_db()
-    refresh_weeks(20260224)
+    # refresh_weeks(20260224)
+    refresh_weeks()
     # con.execute("""
     # DROP TABLE week_check""")
     #
@@ -156,11 +161,7 @@ if __name__ == '__main__':
     #         price_high DECIMAL(18, 4),
     #         price_low DECIMAL(18, 4),
     #         price_close DECIMAL(18, 4),
-    #         current_trend VARCHAR,
-    #         extra_mark VARCHAR,
-    #         buy_tag VARCHAR,
-    #         resistance_price DECIMAL(18, 4),
-    #         percent_u_30 DECIMAL(18, 4)
+    #         pin_bar_tag VARCHAR
     #     )
     # """)
 

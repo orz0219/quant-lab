@@ -146,7 +146,7 @@ def refresh_weeks(week=None):
 
 if __name__ == '__main__':
     # 计算周K 获取每周的日期 然后查询
-    # add_db()
+    add_db()
     # refresh_weeks(20260224)
     refresh_weeks()
     # con.execute("""

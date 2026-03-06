@@ -1,21 +1,13 @@
 """
-有几个问题
-pinBar 如何定义
-压力位如何定义
-支撑位如何定义
-趋势线如何定义 当前趋势如何判断
-盈亏比大于2怎么标记
-
-
 基于pinBar的周线交易系统
 
 pinBar的定义
-小实体（开盘≈收盘）+ 单侧显著长影线（“鼻子”），影线长度通常≥实体2.5倍，且占K线总长65%以上
+下影线长度通常≥（实体+上影线）2倍
 
 pinBar的合并
-可以最多由3根K线组成 所以需要做一个移动数组
-
+可以最多由3根K线组成
 """
+from decimal import Decimal, getcontext
 
 import duckdb
 import pandas as pd
@@ -23,25 +15,84 @@ import pandas as pd
 # 链接数据库
 con = duckdb.connect('stock.duckdb')
 
+getcontext().prec = 4
+
+
+def get_lower_shadow_range(kline):
+    o = Decimal(str(kline['open_p']))
+    c = Decimal(str(kline['close_p']))
+    l = Decimal(str(kline['low_p']))
+
+    # 下影线底部永远是 low
+    bottom = l
+    # 下影线顶部是 open 和 close 中较小的那个
+    top = min(o, c)
+
+    return bottom, top
+
+def calculate_lower_shadow_overlap(current_k, prev_k):
+    """
+    计算当前K线下影线与前一根K线整体区间的重叠度
+    返回重叠部分占当前下影线长度的比例 (0.0 ~ 1.0)
+    """
+    # 1. 获取当前K线下影线区间
+    curr_shadow_bottom, curr_shadow_top = get_lower_shadow_range(current_k)
+    curr_shadow_len = curr_shadow_top - curr_shadow_bottom
+
+    # 2. 获取前一根K线的整体区间
+    prev_low = prev_k[4]
+    prev_high = prev_k[3]
+
+    # 3. 计算重叠部分
+    # 重叠区的上界 = min(当前下影线顶, 前K线高)
+    overlap_top = min(curr_shadow_top, prev_high)
+    # 重叠区的下界 = max(当前下影线底, 前K线低)
+    overlap_bottom = max(curr_shadow_bottom, prev_low)
+
+    overlap_len = overlap_top - overlap_bottom
+
+    # 如果没有重叠
+    if overlap_len <= 0:
+        return Decimal('0')
+
+    # 4. 计算比例 (重叠长度 / 当前下影线总长度)
+    ratio = overlap_len / curr_shadow_len
+
+    # 限制最大值为 1 (防止浮点误差或逻辑极端情况)
+    return min(ratio, Decimal('1'))
+
 
 def check_pin_bar(open_p, high_p, low_p, close_p):
+    rr_ratio = Decimal(2)  # 盈亏比设定
+    pin_bar_tag = False
     if high_p == low_p:
         pin_bar_tag = False
     elif close_p >= open_p:
-        if high_p == open_p:
-            pin_bar_tag = True
+        if close_p == open_p:
+            if high_p == open_p:
+                pin_bar_tag = True
         else:
             pin_bar_tag = (open_p - low_p) / (high_p - open_p) >= 2.5
     else:
         pin_bar_tag = (close_p - low_p) / (high_p - close_p) >= 2.5
-    return pin_bar_tag
+    if pin_bar_tag:
+        return {
+            'open_p': open_p,
+            'high_p': high_p,
+            'low_p': low_p,
+            'close_p': close_p,
+            'win_p': high_p + (high_p - low_p) * rr_ratio,
+            'lose_p': low_p - Decimal(0.01),
+            'status': 'Open'
+        }
+    else: return None
 
 
 def check(result):
     code = ''
     pin_bar_arr = [] #长度为10
     data_to_insert = []
-
+    active_trade = None
 
     for row in result:
         if code == '':
@@ -55,49 +106,100 @@ def check(result):
 
         pt = 'N'
 
-        # 单根pin_bar处理
-        pin_bar_tag = check_pin_bar(open_p, high_p, low_p, close_p)
+        if trade_date == 20260302:
+            print(1)
+
+        near_high = high_p
+        if len(pin_bar_arr) > 1:
+            near_high = max(pin_bar_arr, key=lambda x: x[3])[3]
+
+        #计算上一个pin_bar是否发生了买入
+        tag_win = False
+        tag_lose = False
+        if active_trade is not None:
+            if (active_trade['high_p'] < high_p < active_trade['win_p'] and not active_trade['status'] == 'HOLD'
+                    and near_high > active_trade['high_p'] * Decimal(2)):
+                #计算8周内是否出现2倍盈亏比的高点
+                active_trade['status'] = 'HOLD'
+                pt = 'BUY'
+            if active_trade['status'] == 'HOLD':
+                if high_p > active_trade['win_p']:
+                    tag_win = True
+                    active_trade = None
+                if active_trade is not None and low_p < active_trade['lose_p']:
+                    tag_lose = True
+                    active_trade = None
+            else:
+                active_trade = None
 
         pin_bar_arr.append(row)
         if len(pin_bar_arr) > 8:
             pin_bar_arr.pop(0)
 
-        # 多根pin_bar处理
-        if not pin_bar_tag:
-            if len(pin_bar_arr) > 1:
-                merge_open = pin_bar_arr[-2][2]
-                merge_close = close_p
-                merge_high = max(pin_bar_arr[-2][3], high_p)
-                merge_low = min(pin_bar_arr[-2][4], low_p)
-                pin_bar_tag = check_pin_bar(merge_open, merge_high, merge_low, merge_close)
-                if not pin_bar_tag:
-                    if len(pin_bar_arr) > 2:
-                        merge_open_1 = pin_bar_arr[-3][2]
-                        merge_close_1 = close_p
-                        merge_high_1 = max(pin_bar_arr[-3][3], high_p)
-                        merge_low_1 = min(pin_bar_arr[-3][4], pin_bar_arr[-2][4], low_p)
-                        pin_bar_tag = check_pin_bar(merge_open_1, merge_high_1, merge_low_1, merge_close_1)
-                        if pin_bar_tag:
-                            pt = 'P3'
-                elif pin_bar_tag:
-                    pt = 'P2'
+        if active_trade is None and not tag_win and not tag_lose:
+            # 单根pin_bar处理
+            active_trade = check_pin_bar(open_p, high_p, low_p, close_p)
+
+            # 多根pin_bar处理
+            if active_trade is None:
+                if len(pin_bar_arr) > 1:
+                    merge_open = pin_bar_arr[-2][2]
+                    merge_close = close_p
+                    merge_high = max(pin_bar_arr[-2][3], high_p)
+                    merge_low = min(pin_bar_arr[-2][4], low_p)
+                    active_trade = check_pin_bar(merge_open, merge_high, merge_low, merge_close)
+                    if active_trade is None:
+                        if len(pin_bar_arr) > 2:
+                            p3 = pin_bar_arr[-3]
+                            p2 = pin_bar_arr[-2]
+                            merge_open_1 = p3[2]  # 通常取第一根的开盘
+                            merge_close_1 = close_p
+                            merge_high_1 = max(p3[3], p2[3], high_p)
+                            merge_low_1 = min(p3[4], p2[4], low_p)
+                            active_trade = check_pin_bar(merge_open_1, merge_high_1, merge_low_1, merge_close_1)
+                            if active_trade is not None:
+                                pt = 'P3'
+                    else:
+                        pt = 'P2'
+            else:
+                pt = 'P1'
         else:
-            pt = 'P1'
+            if tag_win:
+                pt = 'WIN'
+            elif tag_lose:
+                pt = 'LOSE'
 
+        # 添加pin bar重合度校验
+        ratio = Decimal(0)
+        if pt == 'P1' and len(pin_bar_arr) > 1:
+            for i in range(len(pin_bar_arr) - 1):
+                r = pin_bar_arr[i]
+                ratio += calculate_lower_shadow_overlap(active_trade, r)
+            ratio = ratio / Decimal(len(pin_bar_arr) - 1)
+        elif pt == 'P2' and len(pin_bar_arr) > 2:
+            for i in range(len(pin_bar_arr) - 2):
+                r = pin_bar_arr[i]
+                ratio += calculate_lower_shadow_overlap(active_trade, r)
+            ratio = ratio / Decimal(len(pin_bar_arr) - 2)
+        elif pt == 'P3' and len(pin_bar_arr) > 3:
+            for i in range(len(pin_bar_arr) - 3):
+                r = pin_bar_arr[i]
+                ratio += calculate_lower_shadow_overlap(active_trade, r)
+            ratio = ratio / Decimal(len(pin_bar_arr) - 3)
 
-        # 获取8根K线的高点 如果当前K为最高点或者离高点的盈亏比为2 则生效
-        # highest = max(k[3] for k in pin_bar_arr)
-        # if pin_bar_tag and (highest == high_p or (highest - high_p) / (high_p - low_p) >= 2):
-        #     pin_bar_tag = True
-        # else:
-        #     pin_bar_tag = False
-        #
-        # if not pin_bar_tag:
+        # if ratio > 0.382:
+        #     active_trade = None
         #     pt = 'N'
 
+        win_p = Decimal(0)
+        lose_p = Decimal(0)
+        if active_trade is not None:
+            win_p = active_trade['win_p']
+            lose_p = active_trade['lose_p']
         # 打印结果
-        print(
-            f"{code} {trade_date} {open_p} {close_p} {high_p} {low_p} {pt}")
+        if pt != 'N':
+            print(
+                f"{code} {trade_date} {open_p} {close_p} {high_p} {low_p} {pt} {ratio} {win_p} {lose_p} {near_high}")
 
         data_to_insert.append((
             code,
@@ -106,16 +208,17 @@ def check(result):
             high_p,
             low_p,
             close_p,
-            pt
+            pt,
+            ratio,
+            win_p,
+            lose_p,
+            near_high
         ))
 
     return data_to_insert
 
 
-def check_all(the_date=20160224, ts_code=None):
-    con.execute("""
-        DROP TABLE IF EXISTS week_check;
-    """)
+def check_all(the_date=20160101, ts_code=None):
     if ts_code is None:
         result = con.sql("""
                          select *
@@ -144,12 +247,16 @@ def check_all(the_date=20160224, ts_code=None):
         data_to_insert.extend(arr)
 
     if len(data_to_insert) > 0:
+        print(len(data_to_insert))
         df = pd.DataFrame(
             data_to_insert,
-            columns=['ts_code', 'trade_date', 'price_open', 'price_high', 'price_low', 'price_close', 'pin_bar_tag']
+            columns=['ts_code', 'trade_date', 'price_open', 'price_high', 'price_low', 'price_close', 'pin_bar_tag', 'radio', 'win_p', 'lose_p', 'near_high']
         )
 
         df.to_csv('2.csv', index=False)
+        con.execute("""
+                    DROP TABLE IF EXISTS week_check;
+                    """)
         con.execute("""
                     CREATE TABLE week_check AS
                     SELECT *
@@ -161,12 +268,17 @@ def check_all(the_date=20160224, ts_code=None):
                             escape = '"',
                             nullstr = '',
                             columns = {
-                                'ts_code': 'VARCHAR', 'trade_date': 'BIGINT',
+                                'ts_code': 'VARCHAR',
+                                'trade_date': 'BIGINT',
                                     'price_open': 'DECIMAL(18,4)',
                                     'price_high': 'DECIMAL(18,4)',
                                     'price_low': 'DECIMAL(18,4)',
                                     'price_close': 'DECIMAL(18,4)',
-                                'pin_bar_tag': 'VARCHAR'
+                                'pin_bar_tag': 'VARCHAR',
+                                'radio':'DECIMAL(18,4)',
+                                'win_p': 'DECIMAL(18,4)',
+                                'lose_p': 'DECIMAL(18,4)',
+                                'near_high': 'DECIMAL(18,4)',
                                 },
                             auto_detect = false
                          )
@@ -189,9 +301,9 @@ def select_today():
 
 
 if __name__ == '__main__':
-    # check_all()
-    select_today()
-    # check_all()
+    check_all()
+    # select_today()
+    # check_all(ts_code='603665.SH')
     # check()
     # print(con.execute("""
     #                   SELECT column_name, data_type

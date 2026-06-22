@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<script>
+// sandbox.html - 安全沙箱容器
+// 运行在 iframe sandbox="allow-scripts" 中，无 allow-same-origin
+var worker = null;
+self.addEventListener('message', function (e) {
+  var msg = e.data;
+  if (!msg || !msg.type) return;
+  switch (msg.type) {
+    case 'LOAD_STRATEGY':
+      terminateWorker();
+      worker = new Worker('./sandbox-worker.js');
+      worker.addEventListener('message', function (ev) { self.parent.postMessage(ev.data, '*'); });
+      worker.addEventListener('error', function (err) { self.parent.postMessage({ type: 'STRATEGY_ERROR', error: 'Worker 错误: ' + (err.message || '未知错误') }, '*'); });
+      worker.postMessage(msg);
+      break;
+    case 'TICK':
+      if (worker) worker.postMessage(msg);
+      break;
+    case 'DESTROY':
+      if (worker) worker.postMessage(msg);
+      terminateWorker();
+      self.parent.postMessage({ type: 'DESTROYED' }, '*');
+      break;
+    default:
+      if (worker) worker.postMessage(msg);
+  }
+});
+function terminateWorker() { if (worker) { worker.terminate(); worker = null; } }
+</script>
+</body>
+</html>

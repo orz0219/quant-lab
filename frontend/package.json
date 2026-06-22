@@ -1,0 +1,21 @@
+{
+  "name": "quantlab-frontend",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "QuantLab - AI 驱动的股票策略回测系统 (Vue3 + Vite)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0",
+    "echarts": "^5.4.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.4.0"
+  }
+}

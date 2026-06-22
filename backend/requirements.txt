@@ -1,0 +1,17 @@
+# QuantLab - AI 驱动的股票回测系统
+# Python 3.10+
+fastapi>=0.110,<0.116
+uvicorn[standard]>=0.27,<0.32
+pydantic>=2.5,<3.0
+# 数据库
+duckdb>=1.0,<2.0
+pandas>=2.0,<3.0
+# 可选数据来源
+tushare>=1.2.89
+# 回测引擎（可选，默认内置纯 Python 实现）
+# backtrader>=1.9.78
+# 导出
+openpyxl>=3.1
+Pillow>=10.0
+# 配置
+python-dotenv>=1.0

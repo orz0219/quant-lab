@@ -1,0 +1,9 @@
+/data/stock.duckdb
+/backend/.idea/
+/backend/.venv/
+/.pids/
+/frontend/node_modules/
+/.logs/
+/backend/.env
+/.env.example
+/backend/data/db/stock.duckdb

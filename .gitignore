@@ -8,3 +8,4 @@
 /.env.example
 /backend/data/db/stock.duckdb
 /frontend/.vite/
+/.idea/

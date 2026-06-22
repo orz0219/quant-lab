@@ -129,7 +129,7 @@ quick_check_env() {
         missing=true
     fi
     if [[ ! -x "$UVICORN_BIN" ]]; then
-        err "Python uvicorn 未安装（缺少 $UVICORN_BIN）"
+        err "Python uvicorn 未安装（缺少 ${UVICORN_BIN}）"
         missing=true
     fi
     if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
@@ -156,13 +156,13 @@ start_backend() {
         return 0
     fi
 
-    info "启动后端（FastAPI, port $BACKEND_PORT）..."
+    info "启动后端（FastAPI, port ${BACKEND_PORT}）..."
     : > "$BACKEND_LOG"
 
     nohup bash -c "cd '$BACKEND_DIR' && exec '$UVICORN_BIN' app.main:app --host 0.0.0.0 --port $BACKEND_PORT --reload" >> "$BACKEND_LOG" 2>&1 &
     disown $!
     local parent_pid=$!
-    info "  已提交启动（PID $parent_pid），等待服务就绪..."
+    info "  已提交启动（PID ${parent_pid}），等待服务就绪..."
 
     sleep 3
 
@@ -170,7 +170,7 @@ start_backend() {
     listener_pid=$(get_listener_pid "$BACKEND_PORT")
     if [[ -n "$listener_pid" ]]; then
         echo "$listener_pid" > "$BACKEND_PID_FILE"
-        info "  实际监听进程（PID $listener_pid）"
+        info "  实际监听进程（PID ${listener_pid}）"
     else
         echo "$parent_pid" > "$BACKEND_PID_FILE"
         warn "  未找到监听端口的子进程，使用父进程 PID $parent_pid"
@@ -195,17 +195,17 @@ start_frontend() {
         return 0
     fi
 
-    info "启动前端（Vite Dev Server, port $FRONTEND_PORT）..."
+    info "启动前端（Vite Dev Server, port ${FRONTEND_PORT}）..."
     : > "$FRONTEND_LOG"
 
     nohup bash -c "cd '$FRONTEND_DIR' && exec $NODE_BIN vite --host 0.0.0.0 --port $FRONTEND_PORT" >> "$FRONTEND_LOG" 2>&1 &
     disown $!
     local pid=$!
     echo "$pid" > "$FRONTEND_PID_FILE"
-    info "  已提交启动（PID $pid），等待服务就绪..."
+    info "  已提交启动（PID ${pid}），等待服务就绪..."
 
     if wait_for_port "$FRONTEND_PORT" 30; then
-        success "前端启动成功（PID $pid）-> http://localhost:$FRONTEND_PORT"
+        success "前端启动成功（PID ${pid}）-> http://localhost:${FRONTEND_PORT}"
         return 0
     else
         err "前端启动超时，请查看日志: $FRONTEND_LOG"
@@ -333,12 +333,12 @@ do_start() {
 
     if check_port_listening "$BACKEND_PORT"; then
         backend_up=true
-        success "后端已运行（http://localhost:$BACKEND_PORT）"
+        success "后端已运行（http://localhost:${BACKEND_PORT}）"
     fi
 
     if check_port_listening "$FRONTEND_PORT"; then
         frontend_up=true
-        success "前端已运行（http://localhost:$FRONTEND_PORT）"
+        success "前端已运行（http://localhost:${FRONTEND_PORT}）"
     fi
 
     ! $backend_up  && start_backend  || true

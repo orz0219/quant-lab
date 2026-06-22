@@ -12,6 +12,7 @@ const pages = {
 }
 
 export default defineConfig({
+  appType: 'mpa',
   plugins: [
     vue(),
     {

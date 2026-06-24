@@ -18,10 +18,33 @@ PYTHON_BIN="$BACKEND_DIR/.venv/bin/python3"
 PIP_BIN="$BACKEND_DIR/.venv/bin/pip"
 
 # --- 运行 pip 的可靠入口 ---
-# 优先使用 "python -m pip"，比直接调用 bin/pip 更稳健，
-# 可避免 shebang/可执行入口损坏导致的 "No such file or directory"。
 run_pip() {
     "$PYTHON_BIN" -m pip "$@"
+}
+
+# --- 确保 node / npm 在 PATH 中
+# nvm/fnm 通常只在『交互式 shell』里生效，
+# 非交互式运行（./install.sh、cron、systemd）会找不到它们。
+# 这里主动从常见位置加载，并把找到的 node/npm 目录加到 PATH。
+ensure_node_in_path() {
+    local dir
+    for dir in "$HOME/.nvm/versions/node/"*"/bin" \
+               "$HOME/.fnm/node-versions/"*"/installation/bin" \
+               "/usr/local/bin" "/opt/homebrew/bin" \
+               "/usr/bin"; do
+        [[ -d "$dir" ]] || continue
+        if [[ -x "$dir/npm" || -x "$dir/node" ]]; then
+            case ":$PATH:" in
+                *":$dir:"*) ;;
+                *) export PATH="$dir:$PATH" ;;
+            esac
+        fi
+    done
+    # nvm 加载脚本（如果存在）
+    if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+        # shellcheck disable=SC1090
+        (source "$HOME/.nvm/nvm.sh") >/dev/null 2>&1 || true
+    fi
 }
 
 # --- 颜色输出 ---
@@ -35,6 +58,7 @@ section() { echo -e "\n\033[1;36m========== $1 ==========\033[0m"; }
 # 第一阶段: 系统工具检查
 # =====================================================
 check_system_tools() {
+    ensure_node_in_path
     section "系统工具检测"
 
     local ok=true
@@ -53,6 +77,18 @@ check_system_tools() {
         ok=false
     else
         success "Node:    $(node --version 2>&1)"
+    fi
+
+    if ! command -v npm >/dev/null 2>&1; then
+        err "npm 未安装或不在 PATH（常见于 nvm/fnm 下非交互式 shell）"
+        echo "   → 解决: "
+        echo "     1) 如果用 nvm/fnm，请改用: bash -ic './install.sh'"
+        echo "        或先手动加载: source ~/.nvm/nvm.sh  (nvm use 18)"
+        echo "     2) Ubuntu/Debian: apt install -y npm"
+        echo "     3) 若已安装仅 PATH 不对，可用: ln -s /usr/local/bin/npm /usr/bin/npm"
+        ok=false
+    else
+        success "npm:     $(npm --version 2>&1)"
     fi
 
     if ! command -v curl >/dev/null 2>&1; then
@@ -161,13 +197,23 @@ verify_python_deps() {
 # 第四阶段: Node 依赖
 # =====================================================
 setup_frontend_deps() {
+    ensure_node_in_path
     section "前端依赖配置"
+
+    if ! command -v npm >/dev/null 2>&1; then
+        err "npm 不可用（常见原因: nvm/fnm 只在交互式 shell 初始化）"
+        echo "   → 解决: "
+        echo "     1) 改用:  bash -ic './install.sh'"
+        echo "     2) 先手动加载:  source ~/.nvm/nvm.sh; nvm use 18  然后再跑"
+        echo "     3) 系统级安装:  apt install -y npm"
+        exit 1
+    fi
 
     if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
         info "node_modules 不存在，正在安装前端依赖..."
         (cd "$FRONTEND_DIR" && npm install) || {
             err "npm install 失败"
-            echo "   → 解决: 检查网络或 package.json 错误"
+            echo "   → 解决: 检查网络 / package.json / 镜像源 (npm config set registry https://registry.npmmirror.com)"
             exit 1
         }
         success "前端依赖安装完成"

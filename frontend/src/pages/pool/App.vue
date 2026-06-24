@@ -209,7 +209,7 @@ function onLabelClick(e) {
   const label = e.target.closest('.h-label')
   if (!label) return
   if (dragState && dragState.moved) return  // 拖拽中不触发
-  loadIndustryStocks(label.textContent.trim())
+  loadIndustryStocks(label.getAttribute('title') || label.textContent.trim())
 }
 
 // 拖拽滚动状态
@@ -323,9 +323,18 @@ function renderSectorHeatmap(dates, industries, dataItems) {
   gridEl.style.height = Math.max(500, totalH) + 'px'
 
   // 左侧行业名称列（固定不滚动）
+  const lastDi = colOffset + cols - 1
+  const prevDi = colOffset + cols - 2
   let labelsHtml = ''
   for (let ii = 0; ii < rows; ii++) {
-    labelsHtml += `<div class="h-label" title="${industries[ii]}">${industries[ii]}</div>`
+    // 最后一天与前一天比较，标记方向
+    const lastRs = grid[ii + '_' + lastDi]
+    const prevRs = grid[ii + '_' + prevDi]
+    let arrow = ''
+    if (lastRs != null && !isNaN(lastRs) && prevRs != null && !isNaN(prevRs)) {
+      arrow = lastRs > prevRs ? '<span class="arr-up">▴</span>' : lastRs < prevRs ? '<span class="arr-down">▾</span>' : ''
+    }
+    labelsHtml += `<div class="h-label" title="${industries[ii]}">${industries[ii]} ${arrow}</div>`
   }
   labelsEl.innerHTML = labelsHtml
   labelsEl.style.height = Math.max(500, totalH) + 'px'
@@ -450,6 +459,8 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 .h-label:hover { color: #E2E8F0; }
+.arr-up { color: #ef4444; font-size: 14px; }
+.arr-down { color: #22c55e; font-size: 14px; }
 .h-cell {
   width: 10px; height: 16px;
   border-radius: 1px;

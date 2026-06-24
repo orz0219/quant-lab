@@ -17,6 +17,13 @@ FRONTEND_DIR="$PROJECT_ROOT/frontend"
 PYTHON_BIN="$BACKEND_DIR/.venv/bin/python3"
 PIP_BIN="$BACKEND_DIR/.venv/bin/pip"
 
+# --- 运行 pip 的可靠入口 ---
+# 优先使用 "python -m pip"，比直接调用 bin/pip 更稳健，
+# 可避免 shebang/可执行入口损坏导致的 "No such file or directory"。
+run_pip() {
+    "$PYTHON_BIN" -m pip "$@"
+}
+
 # --- 颜色输出 ---
 info()    { echo -e "\033[1;34m[INFO]\033[0m  $1"; }
 warn()    { echo -e "\033[1;33m[WARN]\033[0m  $1"; }
@@ -66,9 +73,18 @@ check_system_tools() {
 setup_python_env() {
     section "Python 环境配置"
 
-    # 1. 创建虚拟环境
+    local need_recreate=false
+
     if [[ ! -f "$PYTHON_BIN" ]]; then
         info "Python 虚拟环境不存在，正在创建..."
+        need_recreate=true
+    elif ! "$PYTHON_BIN" -m pip --version >/dev/null 2>&1; then
+        warn "虚拟环境已存在但 pip 不可用，将重建虚拟环境..."
+        need_recreate=true
+    fi
+
+    if $need_recreate; then
+        rm -rf "$BACKEND_DIR/.venv"
         (cd "$BACKEND_DIR" && python3 -m venv .venv) || {
             err "虚拟环境创建失败"
             exit 1
@@ -78,13 +94,11 @@ setup_python_env() {
         info "Python 虚拟环境已存在（跳过）"
     fi
 
-    # 2. 升级 pip
     info "更新 pip 至最新版本..."
-    "$PIP_BIN" install --upgrade pip -q || warn "pip 升级失败（可忽略）"
+    run_pip install --upgrade pip -q || warn "pip 升级失败（可忽略）"
 
-    # 3. 安装/更新依赖 (pip 自身是幂等的，重复执行无副作用)
     info "安装后端 Python 依赖 (requirements.txt)..."
-    "$PIP_BIN" install -r "$BACKEND_DIR/requirements.txt" || {
+    run_pip install -r "$BACKEND_DIR/requirements.txt" || {
         err "Python 依赖安装失败"
         echo "   → 解决: 检查网络或版本冲突"
         exit 1
@@ -134,7 +148,7 @@ verify_python_deps() {
 
     $all_ok || {
         err "部分 Python 依赖缺失，正在重新安装..."
-        "$PIP_BIN" install -r "$BACKEND_DIR/requirements.txt" || {
+        run_pip install -r "$BACKEND_DIR/requirements.txt" || {
             err "重新安装失败，请检查网络"
             exit 1
         }

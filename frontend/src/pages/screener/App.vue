@@ -5,9 +5,9 @@
     <Nav active="screener" />
     <main class="workspace-single">
       <div class="headline center">
-        <div class="pill"><span class="pill-dot"></span> 最近一周策略买点扫描</div>
+        <div class="pill"><span class="pill-dot"></span> 策略买点扫描 · 自定义日期范围</div>
         <h2 class="head-title"><span class="grad-text">选股</span> 标签 · 发现你的<span class="grad-text-2">目标股票</span></h2>
-        <p class="head-sub">选择你关注的策略，系统将自动扫描所有可查询股票，挑出最近一周内出现买点信号的标的。</p>
+        <p class="head-sub">选择你关注的策略，设置日期范围和板块条件，系统将自动扫描所有可查询股票，挑出指定日期内出现买点信号的标的。</p>
       </div>
       <section class="glass card">
         <div class="card-head"><div class="card-title"><span class="title-dot cyan"></span> 策略选择</div></div>
@@ -25,9 +25,37 @@
               </div>
             </div>
           </div>
-          <div class="screener-row-bottom" style="flex-direction:column;align-items:center;">
+          <div class="screener-row-bottom" style="flex-direction:column;align-items:stretch;">
             <div class="scan-divider"></div>
-            <button class="btn-primary scan-btn" @click="startScan">{{ btnLabel }}</button>
+            <div class="scan-filters">
+              <div class="scan-date-range">
+                <div class="scan-filter-group">
+                  <label>扫描开始日期</label>
+                  <input type="date" v-model="startDate" class="scan-date-input" />
+                </div>
+                <div class="scan-filter-group">
+                  <label>扫描结束日期</label>
+                  <input type="date" v-model="endDate" class="scan-date-input" />
+                </div>
+              </div>
+              <div class="scan-board-checks">
+                <label class="scan-check-item">
+                  <input type="checkbox" v-model="filterMainBoard" class="scan-chk" />
+                  <span>沪深主板</span>
+                </label>
+                <label class="scan-check-item">
+                  <input type="checkbox" v-model="filterChiNext" class="scan-chk" />
+                  <span>创业板</span>
+                </label>
+                <label class="scan-check-item">
+                  <input type="checkbox" v-model="filterExcludeST" class="scan-chk" />
+                  <span>剔除ST</span>
+                </label>
+              </div>
+            </div>
+            <div style="text-align:center;margin-top:8px;">
+              <button class="btn-primary scan-btn" @click="startScan">{{ btnLabel }}</button>
+            </div>
           </div>
         </div>
       </section>
@@ -42,7 +70,7 @@
       </section>
       <section class="glass card">
         <div class="card-head">
-          <div class="card-title"><span class="title-dot pink"></span> 一周内出现买点的股票</div>
+          <div class="card-title"><span class="title-dot pink"></span> 扫描结果 · 出现买点的股票</div>
           <div class="card-head-actions">
             <input type="text" v-model="keyword" placeholder="过滤代码/名称..." class="card-filter-input" />
             <button class="small-btn btn-primary" style="padding:5px 12px;font-size:12px;white-space:nowrap;" @click="addAllToWatchlist" :disabled="!filteredHits.length">一键添加自选</button>
@@ -51,7 +79,7 @@
         <DataTable
           :columns="tableColumns"
           :rows="filteredHits"
-          empty-text="请先选择策略，然后点击「开始扫描」以获得最近一周内出现买点的股票。"
+          empty-text="请先选择策略，设置日期范围和板块条件，然后点击「开始扫描」以获得出现买点的股票。"
         >
           <template #cell-ts_code="{ row }"><span class="pool-stock-code clickable" @click="openDetail(row)">{{ row.ts_code }}</span></template>
           <template #cell-name="{ value }"><span style="font-weight:600;">{{ value || '—' }}</span></template>
@@ -104,6 +132,19 @@ const keyword = useCache('screener_keyword', '')
 const running = ref(false)
 const stopRequested = ref(false)
 const cache = useScreenerCache()
+
+// 日期范围
+const today = new Date()
+const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const sevenDaysAgo = new Date(today)
+sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+const startDate = ref(toYMD(sevenDaysAgo))
+const endDate = ref(toYMD(today))
+
+// 板块过滤条件
+const filterMainBoard = ref(true)   // 沪深主板
+const filterChiNext = ref(true)     // 创业板
+const filterExcludeST = ref(true)   // 剔除ST
 
 const strategyOptions = computed(() =>
   strategies.value.map(s => ({ value: s.key, label: s.name }))
@@ -260,6 +301,27 @@ async function fetchKlineForStock(tsCode) {
   }))
 }
 
+// ---------- 板块 / ST 过滤 ----------
+function filterStockByBoard(stk) {
+  // ts_code 格式如 "000001.SZ" / "600000.SH" / "300001.SZ"
+  const code = (stk.ts_code || '').toUpperCase().split('.')[0] || ''
+  const isMainBoard = code.startsWith('60') || code.startsWith('00')
+  const isChiNext = code.startsWith('30')
+
+  // 板块勾选过滤：至少选了一个板块才有结果
+  const wantMain = filterMainBoard.value && isMainBoard
+  const wantChiNext = filterChiNext.value && isChiNext
+  if (!wantMain && !wantChiNext) return false
+
+  // 剔除 ST
+  if (filterExcludeST.value) {
+    const name = (stk.name || '').toUpperCase()
+    if (name.includes('ST') || name.includes('*ST')) return false
+  }
+
+  return true
+}
+
 // ---------- 主扫描流程（分批 + 实时更新） ----------
 async function startScan() {
   if (running.value) {
@@ -267,6 +329,10 @@ async function startScan() {
     return
   }
   if (!strategyCode.value) { alert('当前策略无代码，请选含 JS 的策略'); return }
+  if (!filterMainBoard.value && !filterChiNext.value) {
+    alert('请至少选择一个板块（沪深主板 或 创业板）')
+    return
+  }
 
   cache.clear()
   running.value = true
@@ -277,18 +343,17 @@ async function startScan() {
   const params = {}
   strategyParams.value.forEach(p => { params[p.id] = p.value })
 
-  // 最近 7 天的截止日期（与 API trade_date 格式一致：YYYY-MM-DD）
-  const now = new Date()
-  const weekAgo = new Date(now)
-  weekAgo.setDate(weekAgo.getDate() - 7)
-  const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  const cutoffStr = toYMD(weekAgo)
+  // 用户设置的日期范围（YYYY-MM-DD 格式）
+  const signalStart = startDate.value
+  const signalEnd = endDate.value
 
   try {
     // 1. 获取股票列表
     const stockRes = await fetchStocks('')
     const allStocks = stockRes?.items || []
-    const total = allStocks.length
+
+    // 2. 按板块/ST 条件过滤
+    const filteredStocks = allStocks.filter(filterStockByBoard)
 
     const results = []
     let scannedCount = 0
@@ -302,7 +367,7 @@ async function startScan() {
         stopRequested.value = false
         return
       }
-      const batch = allStocks.slice(idx, idx + BATCH)
+      const batch = filteredStocks.slice(idx, idx + BATCH)
       if (!batch.length) {
         cache.save(results, scannedCount)
         running.value = false
@@ -315,8 +380,8 @@ async function startScan() {
           if (klines.length < 20) return { skip: true }
           const buySignals = runBuySignalsOnStock(strategyCode.value, params, klines)
           if (!buySignals.length) return { skip: true }
-          // 只取最近一周内的买入信号（信号日期为数字格式 YYYYMMDD）
-          const recent = buySignals.filter(s => s.trade_date >= cutoffStr)
+          // 用用户设置的日期范围过滤信号
+          const recent = buySignals.filter(s => s.trade_date >= signalStart && s.trade_date <= signalEnd)
           if (!recent.length) return { skip: true }
           const last = recent[recent.length - 1]
           return {
@@ -335,7 +400,7 @@ async function startScan() {
         idx += BATCH
         totalScanned.value = scannedCount
         // 按信号日期降序排列，最新信号排第一
-        results.sort((a, b) => b.signal_date.localeCompare(a.signal_date))
+        results.sort((a, b) => b.signal_date?.localeCompare(a.signal_date) || 0)
         hits.value = [...results]
         // 每批完成后更新缓存
         cache.save(results, scannedCount)

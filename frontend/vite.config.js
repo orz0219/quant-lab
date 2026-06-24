@@ -9,6 +9,7 @@ const pages = {
   screener: resolve(__dirname, 'src/pages/screener/index.html'),
   pool: resolve(__dirname, 'src/pages/pool/index.html'),
   forum: resolve(__dirname, 'src/pages/forum/index.html'),
+  roadmap: resolve(__dirname, 'src/pages/roadmap/index.html'),
 }
 
 export default defineConfig({

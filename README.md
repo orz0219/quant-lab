@@ -1,13 +1,9 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-blue?style=flat-square&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/Vue-3.4-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue" />
-  <img src="https://img.shields.io/badge/Vite-5.4-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite" />
-  <img src="https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/DuckDB-1.0-FFF000?style=flat-square&logo=duckdb&logoColor=black" alt="DuckDB" />
-  <img src="https://img.shields.io/badge/ECharts-5.4-AA344D?style=flat-square&logo=apacheecharts&logoColor=white" alt="ECharts" />
-  <br/>
-  <img src="https://img.shields.io/badge/status-beta-8B5CF6?style=flat-square" alt="Status: Beta" />
+  <img src="https://img.shields.io/badge/status-v0.1_Beta-FBBF24?style=flat-square" alt="Status" />
   <img src="https://img.shields.io/badge/license-MIT-22C55E?style=flat-square" alt="License" />
+  <a href="https://github.com/orz0219/quant-lab">
+    <img src="https://img.shields.io/badge/GitHub-orz0219/quant--lab-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub" />
+  </a>
 </p>
 
 <h1 align="center">
@@ -15,255 +11,150 @@
 </h1>
 
 <p align="center">
-  <b>AI 驱动的量化回测系统 · 用自然语言描述策略，一键验证</b><br/>
-  <sub>面向 A 股 · 纯本地运行 · 无需数据库</sub>
+  <b>面向 A 股的量化回测系统 · 让每一个交易想法都被数据认真验证</b><br/>
+  <sub>纯本地运行 · 零配置启动 · 支持自然语言生成策略</sub>
 </p>
-
-<br/>
 
 ---
 
-## ✨ 亮点速览
+## 一、是什么
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                                                         │
-│   ⚡ 自然语言生成策略 → 输入"5日均线上穿20日均线买入"     │
-│   📊 交互式 K 线回测  → 可视化交易信号与权益曲线         │
-│   🔍 全市场选股扫描  → 按策略 Pick 买点信号              │
-│   🛢️ 零配置数据库     → DuckDB 单文件，启动即用          │
-│   🌐 多页面架构       → 回测 / 选股 / 股票池 / 行业热力图 │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
+QuantLab 是一个**可以在自己电脑上跑的 A 股量化回测工具**。
 
-<br/>
+你有一个关于买卖股票的想法？输入「5 日均线上穿 20 日均线买入」—— QuantLab 会在历史 K 线上把这个策略跑一遍，告诉你：
 
-## 🧭 页面一览
+- 过去几年胜率多少？
+- 最大回撤多少？
+- 每一笔交易具体是什么时候买/卖的？
+- 如果拿 10 万本金开始，现在会变成多少？
 
-### 1. 回测工作台 <sub>`/pages/backtest/`</sub>
+### 核心功能
 
-选择股票 → 选策略 → 点运行，几秒内得到完整的回测报告。支持：
+| 功能 | 说明 |
+|------|------|
+| **📊 交互式 K 线回测** | 选择股票 → 选策略 → 一键运行，几秒内得到完整回测报告 |
+| **🔍 全市场选股扫描** | 用一个策略扫描全市场，找出最近出现买点信号的股票 |
+| **📁 自选股票池** | 把看好的股票收集起来，按板块分类管理，强中选强 |
+| **🔥 行业热力图** | 一眼看出哪些板块最近在走强，辅助选股判断 |
+| **⚡ 策略库管理** | 预置多种经典策略，也可以自定义你的策略规则 |
 
-- **K 线图** 含 MA 均线、成交量、买卖信号标记
-- **权益曲线** 可视化资金变化
-- **交易明细表** 每笔交易的买入/卖出时间与盈亏
-- **AI 策略生成** 描述你的想法，自动生成回测代码
-- **指标设置抽屉** 自定义 K 线颜色、均线周期
+所有数据和策略都保存在你的本地电脑上，**不上云、不联网**（除数据采集外）。
 
-### 2. 选股扫描器 <sub>`/pages/screener/`</sub>
+---
 
-- 选择一个策略，扫描全市场股票
-- 找出最近一周内出现 **买点信号** 的标的
-- 一键 **加入自选池**
+## 二、为什么
 
-### 3. 股票池 <sub>`/pages/pool/`</sub>
+### 痛点：每个人都有「感觉能赚钱」的想法，但没人真正验证过
 
-- 管理自选股票
-- 按行业板块归类，支持一键跳转回测
-- **强中选强**，锁定主线
+你有没有过这种感觉？
 
-### 4. 行业热力图 <sub>`/pages/forum/`</sub>
+- 「5 日线上穿 20 日线，看起来总涨」
+- 「最近这个板块很强，随便买一只应该都能赚」
+- 「这个形态之前准过，再出现一次肯定没错」
 
-- 各行业板块的 **RS（相对强度）时序热力图**
-- RS = 板块过去 20 日累积涨幅 / 全市场涨幅
-- 按最后一天 RS 降序排列，一眼看出强势板块轮动
+**感觉会骗人，但数据不会。**
 
-<br/>
+市面上的量化平台要么上手门槛太高（需要会编程、需要装数据库），要么把你的策略放在云端，缺乏安全感。
 
-## 🏗️ 技术架构
+### QuantLab 的思路
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    🌐 前端 (Port 3000)                   │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  Vite 5 + Vue 3 + vue-router                      │  │
-│  │  多页面 MPA：backtest / screener / pool / forum    │  │
-│  │  ECharts 5 图表 · lightweight-charts K线          │  │
-│  └──────────┬────────────────────────────────────────┘  │
-│             │  /api/* 代理                              │
-├─────────────┼───────────────────────────────────────────┤
-│             ▼  http://localhost:8000                     │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  FastAPI + Uvicorn                                │  │
-│  │  RESTful API /api/v1/*                            │  │
-│  └──────────┬────────────────────────────────────────┘  │
-│             │                                            │
-├─────────────┼───────────────────────────────────────────┤
-│             ▼                                            │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  DuckDB (单文件数据库)                              │  │
-│  │  📁 backend/data/db/stock.duckdb                   │  │
-│  │  表: daily / weekly / stock_info / user_strategies  │  │
-│  │      sector_rs_cache / indicator_settings           │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
-│  数据源: Tushare Pro (可选)                               │
-│  回测引擎: 内置纯 Python · 不依赖 backtrader              │
-│  AI 策略生成: 内置规则引擎 (可替换为 LLM)                 │
-└─────────────────────────────────────────────────────────┘
-```
+**把「感觉能赚钱」这四个字，变成一个可回答的问题**：
 
-<br/>
+1. **零配置启动** — 不需要装 MySQL/PostgreSQL/Docker。DuckDB 单文件即开即用
+2. **自然语言友好** — 即使不会写策略代码，也能描述你的想法生成规则
+3. **纯本地运行** — 你的策略、你的自选池、你的回测结果，都在你自己的电脑上
+4. **漂亮但不花哨** — 玻璃态 UI，让数据可视化成为一种享受
 
-## 🚀 快速开始
+---
 
-### 前置条件
+## 三、怎么用
+
+### 环境要求
 
 - **Python 3.10+**
 - **Node.js 18+**
-- **curl**（macOS 自带 / Linux 需安装）
+- macOS / Linux / Windows 都支持
 
-### macOS / Linux / Git Bash
+### 一键启动（macOS / Linux）
 
 ```bash
-# 1. 一键安装所有依赖
+# 1. 克隆项目
+git clone https://github.com/orz0219/quant-lab.git
+cd quant-lab
+
+# 2. 安装依赖
 bash install.sh
 
-# 2. 启动服务（后端 + 前端 + 数据更新）
+# 3. 启动服务
 bash start.sh
-
-# 其他命令
-bash start.sh stop       # 停止服务
-bash start.sh restart    # 重启服务
-bash start.sh status     # 查看服务状态
 ```
 
-### Windows PowerShell
+### Windows
 
 ```bat
-双击 install.bat    # 安装依赖
-双击 start.bat      # 启动服务
-双击 stop.bat       # 停止服务
+双击 install.bat   # 安装依赖
+双击 start.bat     # 启动服务
 ```
-
-> 第一次启动会引导你配置 Tushare Token（数据采集用）。即使不配置，回测功能依然可用（使用示例数据）。
 
 ### 访问地址
 
-| 服务 | 地址 |
+启动后打开浏览器：
+
+| 页面 | 地址 |
 |------|------|
-| 前端界面 | [http://localhost:3000](http://localhost:3000) |
-| 后端 API | [http://localhost:8000](http://localhost:8000) |
-| API 文档 | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| 回测工作台 | http://localhost:3000/pages/backtest/ |
+| 选股扫描 | http://localhost:3000/pages/screener/ |
+| 自选股票池 | http://localhost:3000/pages/pool/ |
+| 行业热力图 | http://localhost:3000/pages/forum/ |
+| 策略库管理 | http://localhost:3000/pages/strategies/ |
+| **产品蓝图** | http://localhost:3000/pages/roadmap/ |
+| API 文档 | http://localhost:8000/docs |
 
-<br/>
+### 关于数据
 
-## 📡 API 概览
+**第一次启动会引导你配置 Tushare Token**（用于自动更新 A 股行情数据）。
 
-| 路径 | 方法 | 说明 |
-|------|------|------|
-| `/health` | GET | 健康检查 |
-| `/api/v1/stocks` | GET | 股票列表搜索 |
-| `/api/v1/stocks/{ts_code}/kline` | GET | K 线数据 |
-| `/api/v1/stocks/by_industry` | GET | 按行业分组股票 |
-| `/api/v1/backtest` | POST | 执行回测 |
-| `/api/v1/strategy/generate` | POST | AI 策略生成 |
-| `/api/v1/strategies` | GET/POST | 用户策略 CRUD |
-| `/api/v1/strategies/{id}` | GET/PUT/DELETE | 策略详情 |
-| `/api/v1/sectors/rs` | GET | 板块 RS 热力图数据 |
-| `/api/v1/settings/indicators` | GET/PUT | 指标显示设置 |
+> 即使不配置 Tushare Token，系统自带示例数据，核心的 K 线回测和策略功能依然可用。
 
-<br/>
-
-## 📂 项目结构
-
-```
-tvp/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   │   └── v1/            # RESTful 接口
-│   │   ├── core/
-│   │   │   ├── config.py      # 全局配置
-│   │   │   ├── database.py    # DuckDB 连接池
-│   │   │   └── models.py      # 数据表 DDL
-│   │   ├── data/
-│   │   │   ├── pipeline/      # 数据采集流水线
-│   │   │   └── sources/       # 数据源 (Tushare)
-│   │   ├── exporter/          # 导出 (Excel/图片)
-│   │   ├── schemas/           # Pydantic 模型
-│   │   ├── services/          # 业务逻辑
-│   │   │   ├── backtest_service.py   # 回测引擎
-│   │   │   ├── stock_service.py      # 股票查询
-│   │   │   └── strategy_service.py   # AI 策略生成
-│   │   └── strategy/          # 策略模块
-│   ├── scripts/               # 命令行脚本
-│   ├── data/db/               # DuckDB 数据库文件
-│   └── .venv/                 # Python 虚拟环境
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── backtest/      # 回测工作台
-│   │   │   ├── screener/      # 选股扫描器
-│   │   │   ├── pool/          # 股票池
-│   │   │   ├── strategies/    # 策略管理
-│   │   │   └── forum/         # 行业热力图
-│   │   ├── components/        # 通用组件
-│   │   ├── hooks/             # 组合式函数
-│   │   ├── utils/             # 工具函数
-│   │   └── assets/            # 样式
-│   └── public/                # 静态资源
-├── install.sh / install.ps1   # 环境安装
-├── start.sh   / start.ps1     # 启动脚本
-└── stop.sh    / stop.ps1      # 停止脚本
-```
-
-<br/>
-
-## 📊 数据流水线
-
-```
-Tushare Pro (可选)
-      │
-      ▼
-  fetch_daily_data.py    ── 日线数据采集
-      │
-      ▼
-  weekly_builder.py      ── 周线数据聚合
-      │
-      ▼
-  calc_sector_rs.py      ── 板块 RS 计算
-      │
-      ▼
-  DuckDB (stock.duckdb)  ── 本地查询
-```
-
-> 数据采集为可选功能。系统内置了示例数据，即使不配置 Tushare Token，K 线回测和策略功能依然可用。
-
-<br/>
-
-## 🧪 本地开发
+### 常用命令
 
 ```bash
-# 后端热重载
-cd backend && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# 前端开发服务器
-cd frontend && npx vite --host 0.0.0.0 --port 3000
+bash start.sh          # 启动所有服务
+bash start.sh stop     # 停止服务
+bash start.sh restart  # 重启服务
+bash start.sh status   # 查看服务运行状态
 ```
 
-<br/>
+---
 
-## 🛠️ 技术栈
+## 四、产品蓝图
 
-| 类别 | 技术 |
+QuantLab 目前是 v0.1 Beta 版本，正在快速迭代中。以下是正在推进的方向：
+
+| 方向 | 说明 |
 |------|------|
-| **前端框架** | Vue 3 + Vite 5 (MPA 多页面) |
-| **图表** | ECharts 5 + lightweight-charts |
-| **后端框架** | FastAPI + Uvicorn |
-| **数据库** | DuckDB (嵌入式 OLAP) |
-| **数据源** | Tushare Pro |
-| **样式** | 极简玻璃态 (Glassmorphism) |
-| **AI 策略** | 内置规则引擎 (可接 LLM) |
-| **启动脚本** | Bash + PowerShell 双平台 |
+| **批量回测引擎** | 一个策略跑全市场，输出按板块/市值/波动率分组的胜率矩阵 |
+| **策略适配度热力图** | 告诉你这个策略在哪些股票、哪些板块上表现最好 |
+| **高级性能指标** | 夏普比率、卡玛比率、收益分布、滚动胜率等专业统计 |
+| **图表深度可视化** | 回撤曲线、蒙特卡洛概率云、叠加面积图等 |
+| **策略参数优化** | 网格搜索 + 贝叶斯优化，自动找到稳健的参数组合 |
+| **AI 自然语言策略** | 输入中文描述，自动生成可回测的策略代码 |
+| **实盘信号推送** | 每日开盘前，推送你关注的策略在自选股票中的信号 |
 
-<br/>
+完整的路线图请访问应用内的「产品蓝图」页面。
+
+---
+
+## 五、免责声明
+
+QuantLab 仅供**学习研究和策略回测演示**使用，不构成任何投资建议。
+
+回测结果基于历史数据，**历史表现不代表未来收益**。实际交易请谨慎决策、做好风险管理。
 
 ---
 
 <p align="center">
-  <sub>Made with ❤️ for A-Share Quantitative Research · 仅供研究演示</sub>
+  <sub>Made with ❤️ for A-Share Quantitative Research</sub>
   <br/>
-  <sub>© 2026 QuantLab</sub>
+  <a href="https://github.com/orz0219/quant-lab">github.com/orz0219/quant-lab</a>
 </p>
